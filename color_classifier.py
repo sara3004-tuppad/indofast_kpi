@@ -215,20 +215,148 @@ def classify_all_stations(kpi_df: pd.DataFrame) -> pd.DataFrame:
     return pd.concat(classified_dfs, ignore_index=True)
 
 
-def get_color_summary(df: pd.DataFrame, week: str = None) -> Dict:
+def get_station_overall_color(classified_df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Get overall station color based on historical data.
+    If station was ever RED in any week → RED
+    If station was ever AMBER in any week (and never RED) → AMBER
+    Otherwise → GREEN
+    
+    Args:
+        classified_df: Dataframe with weekly color classifications
+        
+    Returns:
+        Dataframe with one row per station showing overall status
+    """
+    station_summaries = []
+    
+    for station_id in classified_df['station_id'].unique():
+        station_data = classified_df[classified_df['station_id'] == station_id].copy()
+        station_data = station_data.sort_values('week_num')
+        
+        # Get the latest week's data for current metrics
+        latest_week = station_data.iloc[-1]
+        
+        # Check if ever RED or AMBER
+        ever_red = (station_data['color'] == 'RED').any()
+        ever_amber = (station_data['color'] == 'AMBER').any()
+        
+        # Collect all reasons from history
+        all_red_reasons = station_data[station_data['red_reason'] != '']['red_reason'].unique()
+        all_amber_reasons = station_data[station_data['amber_reason'] != '']['amber_reason'].unique()
+        
+        # Determine overall color
+        if ever_red:
+            overall_color = 'RED'
+            overall_reason = '; '.join(all_red_reasons) if len(all_red_reasons) > 0 else ''
+        elif ever_amber:
+            overall_color = 'AMBER'
+            overall_reason = '; '.join(all_amber_reasons) if len(all_amber_reasons) > 0 else ''
+        else:
+            overall_color = 'GREEN'
+            overall_reason = ''
+        
+        # Calculate WORST values (most critical) and their weeks
+        # For TTS: lower is worse (closer to saturation)
+        tts_values = station_data['tts'].replace([np.inf], np.nan)
+        if tts_values.notna().any():
+            worst_tts_idx = tts_values.idxmin()
+            worst_tts = tts_values.loc[worst_tts_idx]
+            worst_tts_week = station_data.loc[worst_tts_idx, 'week']
+        else:
+            worst_tts = np.inf
+            worst_tts_week = None
+        
+        # For ZHI: higher is worse (zone stress)
+        zhi_values = station_data['zhi'].dropna()
+        if len(zhi_values) > 0:
+            worst_zhi_idx = station_data['zhi'].idxmax()
+            worst_zhi = station_data.loc[worst_zhi_idx, 'zhi']
+            worst_zhi_week = station_data.loc[worst_zhi_idx, 'week']
+        else:
+            worst_zhi = np.nan
+            worst_zhi_week = None
+        
+        # For HBR: higher is worse (burning headroom faster)
+        hbr_values = station_data['hbr'].dropna()
+        if len(hbr_values) > 0:
+            worst_hbr_idx = station_data['hbr'].idxmax()
+            worst_hbr = station_data.loc[worst_hbr_idx, 'hbr']
+            worst_hbr_week = station_data.loc[worst_hbr_idx, 'week']
+        else:
+            worst_hbr = np.nan
+            worst_hbr_week = None
+        
+        # For EMA Util: higher is worse (closer to saturation)
+        ema_values = station_data['ema_util'].dropna()
+        if len(ema_values) > 0:
+            worst_ema_idx = station_data['ema_util'].idxmax()
+            worst_ema_util = station_data.loc[worst_ema_idx, 'ema_util']
+            worst_ema_week = station_data.loc[worst_ema_idx, 'week']
+        else:
+            worst_ema_util = np.nan
+            worst_ema_week = None
+        
+        # For Velocity: higher is worse (growing faster)
+        vel_values = station_data['velocity'].dropna()
+        if len(vel_values) > 0:
+            worst_vel_idx = station_data['velocity'].idxmax()
+            worst_velocity = station_data.loc[worst_vel_idx, 'velocity']
+            worst_velocity_week = station_data.loc[worst_vel_idx, 'week']
+        else:
+            worst_velocity = np.nan
+            worst_velocity_week = None
+        
+        # For Headroom: lower is worse (less capacity left)
+        headroom_values = station_data['headroom'].dropna()
+        if len(headroom_values) > 0:
+            worst_headroom_idx = station_data['headroom'].idxmin()
+            worst_headroom = station_data.loc[worst_headroom_idx, 'headroom']
+            worst_headroom_week = station_data.loc[worst_headroom_idx, 'week']
+        else:
+            worst_headroom = np.nan
+            worst_headroom_week = None
+        
+        # Average utilization
+        avg_util = station_data['kwh'].mean()
+        
+        station_summaries.append({
+            'station_id': station_id,
+            'city': latest_week['city'],
+            'zone': latest_week['zone'],
+            'start_date': latest_week['start_date'],
+            'overall_color': overall_color,
+            'overall_reason': overall_reason,
+            'average_util': avg_util,
+            # Worst (most critical) values and their weeks
+            'worst_ema_util': worst_ema_util,
+            'worst_ema_week': worst_ema_week,
+            'worst_velocity': worst_velocity,
+            'worst_velocity_week': worst_velocity_week,
+            'worst_tts': worst_tts,
+            'worst_tts_week': worst_tts_week,
+            'worst_headroom': worst_headroom,
+            'worst_headroom_week': worst_headroom_week,
+            'worst_hbr': worst_hbr,
+            'worst_hbr_week': worst_hbr_week,
+            'worst_zhi': worst_zhi,
+            'worst_zhi_week': worst_zhi_week,
+        })
+    
+    return pd.DataFrame(station_summaries)
+
+
+def get_color_summary(df: pd.DataFrame, color_column: str = 'color') -> Dict:
     """
     Get summary statistics for color distribution.
     
     Args:
         df: Classified dataframe
-        week: Optional week filter
+        color_column: Name of column containing color values ('color' or 'overall_color')
         
     Returns:
         Dictionary with color counts and percentages
     """
-    if week:
-        df = df[df['week'] == week]
-    
     total = len(df)
     if total == 0:
         return {
@@ -238,7 +366,7 @@ def get_color_summary(df: pd.DataFrame, week: str = None) -> Dict:
             'green_count': 0, 'green_pct': 0
         }
     
-    color_counts = df['color'].value_counts()
+    color_counts = df[color_column].value_counts()
     
     return {
         'total': total,
@@ -249,4 +377,3 @@ def get_color_summary(df: pd.DataFrame, week: str = None) -> Dict:
         'green_count': color_counts.get('GREEN', 0),
         'green_pct': (color_counts.get('GREEN', 0) / total) * 100
     }
-
