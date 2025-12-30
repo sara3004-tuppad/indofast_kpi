@@ -11,7 +11,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from kpi_calculator import process_data, DAILY_CAPACITY, SATURATION_THRESHOLD
-from color_classifier import classify_all_stations, get_color_summary
+from color_classifier import classify_all_stations, get_color_summary, get_station_overall_color
 
 # Page configuration
 st.set_page_config(
@@ -220,6 +220,8 @@ def main():
         try:
             kpi_df, week_cols = process_data(df)
             classified_df = classify_all_stations(kpi_df)
+            # Get overall station colors based on historical data
+            station_summary_df = get_station_overall_color(classified_df)
         except Exception as e:
             st.error(f"Error processing data: {e}")
             return
@@ -228,26 +230,17 @@ def main():
     with st.sidebar:
         st.markdown("### 🔍 Filters")
         
-        # Week selector
-        available_weeks = sorted(classified_df['week'].unique(), key=lambda x: int(x[1:]))
-        selected_week = st.selectbox(
-            "Select Week",
-            available_weeks,
-            index=len(available_weeks) - 1,
-            help="Select the week for analysis"
-        )
-        
         # City filter
-        cities = ['All'] + sorted(classified_df['city'].unique().tolist())
+        cities = ['All'] + sorted(station_summary_df['city'].unique().tolist())
         selected_city = st.selectbox("City", cities)
         
         # Zone filter (filtered by city)
         if selected_city != 'All':
             zone_options = ['All'] + sorted(
-                classified_df[classified_df['city'] == selected_city]['zone'].unique().tolist()
+                station_summary_df[station_summary_df['city'] == selected_city]['zone'].unique().tolist()
             )
         else:
-            zone_options = ['All'] + sorted(classified_df['zone'].unique().tolist())
+            zone_options = ['All'] + sorted(station_summary_df['zone'].unique().tolist())
         selected_zone = st.selectbox("Zone", zone_options)
         
         # Station search
@@ -266,13 +259,13 @@ def main():
         st.markdown("---")
         st.markdown("### 📋 Legend")
         st.markdown("""
-        <span class="status-red">RED</span> Immediate Action Required<br><br>
-        <span class="status-amber">AMBER</span> Early Warning<br><br>
-        <span class="status-green">GREEN</span> Normal Operation
+        <span class="status-red">RED</span> Ever triggered critical condition<br><br>
+        <span class="status-amber">AMBER</span> Ever triggered warning condition<br><br>
+        <span class="status-green">GREEN</span> Always normal operation
         """, unsafe_allow_html=True)
     
-    # Apply filters
-    filtered_df = classified_df[classified_df['week'] == selected_week].copy()
+    # Apply filters to station summary
+    filtered_df = station_summary_df.copy()
     
     if selected_city != 'All':
         filtered_df = filtered_df[filtered_df['city'] == selected_city]
@@ -286,13 +279,13 @@ def main():
         ]
     
     if color_filter:
-        filtered_df = filtered_df[filtered_df['color'].isin(color_filter)]
+        filtered_df = filtered_df[filtered_df['overall_color'].isin(color_filter)]
     
     # Get summary statistics
-    summary = get_color_summary(filtered_df)
+    summary = get_color_summary(filtered_df, color_column='overall_color')
     
     # Main content area
-    st.markdown(f"### 📊 Week {selected_week} Overview")
+    st.markdown("### 📊 Station Status Overview (Based on Historical Data)")
     
     # KPI Cards
     col1, col2, col3, col4 = st.columns(4)
@@ -340,25 +333,24 @@ def main():
     st.markdown("---")
     
     if len(filtered_df) > 0:
-        avg_util = filtered_df['ema_util'].mean()
-        avg_velocity = filtered_df['velocity'].mean()
-        avg_headroom = filtered_df['headroom'].mean()
-        stations_approaching = len(filtered_df[(filtered_df['tts'] < 12) & (filtered_df['tts'] > 0)])
+        avg_worst_util = filtered_df['worst_ema_util'].mean()
+        avg_worst_velocity = filtered_df['worst_velocity'].mean()
+        avg_worst_headroom = filtered_df['worst_headroom'].mean()
+        # stations_approaching = len(filtered_df[(filtered_df['worst_tts'] < 12) & (filtered_df['worst_tts'] > 0)])
         
         mcol1, mcol2, mcol3, mcol4 = st.columns(4)
         
         with mcol1:
-            st.metric("Avg EMA Utilization", f"{avg_util:.1f}%", delta=None)
+            st.metric("Avg Worst EMA Util", f"{avg_worst_util:.1f}%", delta=None, help="Average of worst utilization across stations")
         
         with mcol2:
-            delta_color = "inverse" if avg_velocity > 0 else "normal"
-            st.metric("Avg Velocity", f"{avg_velocity:.2f} ppt/week", delta=f"{avg_velocity:+.2f}")
+            st.metric("Avg Worst Velocity", f"{avg_worst_velocity:.2f} ppt/week", help="Average of worst velocity across stations")
         
         with mcol3:
-            st.metric("Avg Headroom", f"{avg_headroom:.1f} kWh/day")
+            st.metric("Avg Worst Headroom", f"{avg_worst_headroom:.1f} kWh/day", help="Average of minimum headroom across stations")
         
-        with mcol4:
-            st.metric("Approaching Saturation", f"{stations_approaching}", help="Stations with TTS < 12 weeks")
+        # with mcol4:
+        #     st.metric("Approaching Saturation", f"{stations_approaching}", help="Stations with worst TTS < 12 weeks")
     
     st.markdown("---")
     
@@ -370,11 +362,11 @@ def main():
     with chart_col1:
         # Color distribution pie chart
         if len(filtered_df) > 0:
-            color_counts = filtered_df['color'].value_counts()
+            color_counts = filtered_df['overall_color'].value_counts()
             fig_pie = px.pie(
                 values=color_counts.values,
                 names=color_counts.index,
-                title="Station Status Distribution",
+                title="Station Status Distribution (Historical)",
                 color=color_counts.index,
                 color_discrete_map={
                     'RED': '#FF4B4B',
@@ -397,52 +389,40 @@ def main():
         if len(filtered_df) > 0:
             fig_hist = px.histogram(
                 filtered_df,
-                x='ema_util',
+                x='average_util',
                 nbins=20,
-                title="EMA Utilization Distribution",
-                color='color',
+                title="Average Utilization Distribution",
+                color='overall_color',
                 color_discrete_map={
                     'RED': '#FF4B4B',
                     'AMBER': '#FFA500',
                     'GREEN': '#00C853'
                 }
             )
-            fig_hist.add_vline(x=80, line_dash="dash", line_color="red", annotation_text="80% Threshold")
-            fig_hist.add_vline(x=85, line_dash="dash", line_color="darkred", annotation_text="Saturation (85%)")
             fig_hist.update_layout(
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
                 font_color='#888',
-                xaxis_title="EMA Utilization (%)",
+                xaxis_title="Average Utilization (kWh/day)",
                 yaxis_title="Number of Stations",
                 barmode='stack'
             )
             st.plotly_chart(fig_hist, use_container_width=True)
     
     # Trend chart for selected filters
-    st.markdown("### 📉 Utilization Trends")
+    st.markdown("### 📉 Utilization Trends (All Weeks)")
     
-    # Get trend data for all weeks
-    if selected_city != 'All':
-        trend_filter = classified_df['city'] == selected_city
-        if selected_zone != 'All':
-            trend_filter &= classified_df['zone'] == selected_zone
-        trend_data = classified_df[trend_filter].copy()
-    else:
-        trend_data = classified_df.copy()
-    
-    if station_search:
-        trend_data = trend_data[
-            trend_data['station_id'].str.contains(station_search, case=False, na=False)
-        ]
+    # Get trend data for all weeks - filter by selected stations
+    selected_station_ids = filtered_df['station_id'].unique()
+    trend_data = classified_df[classified_df['station_id'].isin(selected_station_ids)].copy()
     
     # Aggregate trend by week
     weekly_trend = trend_data.groupby('week').agg({
-        'ema_util': 'mean',
+        'kwh': 'mean',
         'velocity': 'mean',
         'station_id': 'count'
     }).reset_index()
-    weekly_trend.columns = ['week', 'avg_ema_util', 'avg_velocity', 'station_count']
+    weekly_trend.columns = ['week', 'avg_util', 'avg_velocity', 'station_count']
     weekly_trend = weekly_trend.sort_values('week', key=lambda x: x.str[1:].astype(int))
     
     if len(weekly_trend) > 0:
@@ -451,8 +431,8 @@ def main():
         fig_trend.add_trace(
             go.Scatter(
                 x=weekly_trend['week'],
-                y=weekly_trend['avg_ema_util'],
-                name="Avg EMA Utilization",
+                y=weekly_trend['avg_util'],
+                name="Avg Utilization",
                 line=dict(color='#4A90D9', width=3),
                 fill='tozeroy',
                 fillcolor='rgba(74, 144, 217, 0.1)'
@@ -470,9 +450,7 @@ def main():
             secondary_y=True
         )
         
-        # Add saturation threshold line
-        fig_trend.add_hline(y=85, line_dash="dash", line_color="red", 
-                           annotation_text="Saturation Threshold (85%)", secondary_y=False)
+       
         
         fig_trend.update_layout(
             title="Weekly Utilization & Velocity Trend",
@@ -483,7 +461,7 @@ def main():
             legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5)
         )
         
-        fig_trend.update_yaxes(title_text="EMA Utilization (%)", secondary_y=False)
+        fig_trend.update_yaxes(title_text="Utilization (kWh/day)", secondary_y=False)
         fig_trend.update_yaxes(title_text="Velocity (ppt/week)", secondary_y=True)
         
         st.plotly_chart(fig_trend, use_container_width=True)
@@ -492,21 +470,21 @@ def main():
     st.markdown("### 🗺️ Zone Performance Heatmap")
     
     zone_summary = filtered_df.groupby(['city', 'zone']).agg({
-        'ema_util': 'mean',
+        'worst_ema_util': 'mean',
         'station_id': 'count',
-        'zhi': 'mean'
+        'worst_zhi': 'mean'
     }).reset_index()
-    zone_summary.columns = ['city', 'zone', 'avg_util', 'station_count', 'avg_zhi']
+    zone_summary.columns = ['city', 'zone', 'avg_worst_util', 'station_count', 'avg_worst_zhi']
     
     if len(zone_summary) > 0:
         fig_heatmap = px.treemap(
             zone_summary,
             path=['city', 'zone'],
             values='station_count',
-            color='avg_util',
+            color='avg_worst_util',
             color_continuous_scale=['#00C853', '#FFA500', '#FF4B4B'],
             range_color=[0, 100],
-            title="Zone Utilization (size = station count, color = avg utilization)"
+            title="Zone Utilization (size = station count, color = avg worst utilization)"
         )
         fig_heatmap.update_layout(
             paper_bgcolor='rgba(0,0,0,0)',
@@ -519,29 +497,36 @@ def main():
     
     # Prepare display dataframe
     display_cols = [
-        'station_id', 'city', 'zone', 'color', 
-        'kwh', 'ema_util', 'velocity', 'acceleration',
-        'tts', 'headroom', 'hbr', 'zhi',
-        'red_reason', 'amber_reason'
+        'station_id', 'city', 'zone', 'overall_color', 
+        'average_util', 
+        'worst_ema_util', 'worst_ema_week',
+        'worst_velocity', 'worst_velocity_week',
+        'worst_tts', 'worst_tts_week',
+        'worst_hbr', 'worst_hbr_week',
+        'worst_zhi', 'worst_zhi_week',
+        'overall_reason'
     ]
     
     display_df = filtered_df[display_cols].copy()
     
     # Format numeric columns
-    display_df['ema_util'] = display_df['ema_util'].round(2)
-    display_df['velocity'] = display_df['velocity'].round(3)
-    display_df['acceleration'] = display_df['acceleration'].round(3)
-    display_df['tts'] = display_df['tts'].apply(lambda x: f"{x:.1f}" if x != float('inf') else "∞")
-    display_df['headroom'] = display_df['headroom'].round(2)
-    display_df['hbr'] = display_df['hbr'].round(2)
-    display_df['zhi'] = display_df['zhi'].round(3)
+    display_df['average_util'] = display_df['average_util'].round(2)
+    display_df['worst_ema_util'] = display_df['worst_ema_util'].round(2)
+    display_df['worst_velocity'] = display_df['worst_velocity'].round(3)
+    display_df['worst_tts'] = display_df['worst_tts'].apply(lambda x: f"{x:.1f}" if x != float('inf') and pd.notna(x) else "∞")
+    display_df['worst_hbr'] = display_df['worst_hbr'].round(2)
+    display_df['worst_zhi'] = display_df['worst_zhi'].round(3)
     
     # Rename columns for display
     display_df.columns = [
         'Station ID', 'City', 'Zone', 'Status',
-        'kWh/day', 'EMA Util (%)', 'Velocity', 'Acceleration',
-        'TTS (weeks)', 'Headroom', 'HBR (%)', 'ZHI',
-        'RED Reason', 'AMBER Reason'
+        'Avg Util',
+        'Worst EMA %', 'EMA Week',
+        'Worst Velocity', 'Vel Week',
+        'Worst TTS', 'TTS Week',
+        'Worst HBR %', 'HBR Week',
+        'Worst ZHI', 'ZHI Week',
+        'Alert Reason'
     ]
     
     # Color coding function
@@ -557,15 +542,15 @@ def main():
     # Sort options
     sort_col = st.selectbox(
         "Sort by",
-        ['Status', 'EMA Util (%)', 'Velocity', 'TTS (weeks)', 'ZHI'],
-        index=1
+        ['Status', 'Avg Util', 'Worst EMA %', 'Worst Velocity', 'Worst TTS', 'Worst HBR %', 'Worst ZHI'],
+        index=2
     )
     sort_order = st.radio("Order", ["Descending", "Ascending"], horizontal=True)
     
     ascending = sort_order == "Ascending"
-    if sort_col == 'TTS (weeks)':
+    if sort_col == 'Worst TTS':
         # Handle infinity in sorting
-        display_df['_tts_sort'] = display_df['TTS (weeks)'].apply(
+        display_df['_tts_sort'] = display_df['Worst TTS'].apply(
             lambda x: float('inf') if x == '∞' else float(x)
         )
         display_df = display_df.sort_values('_tts_sort', ascending=ascending)
@@ -593,31 +578,34 @@ def main():
     st.download_button(
         label="📥 Download Filtered Data (CSV)",
         data=csv,
-        file_name=f"indofast_stations_{selected_week}.csv",
+        file_name="indofast_stations_summary.csv",
         mime="text/csv"
     )
     
     # Top critical stations
     st.markdown("### ⚠️ Stations Requiring Immediate Attention")
     
-    critical_df = filtered_df[filtered_df['color'] == 'RED'].nsmallest(10, 'tts')
+    critical_df = filtered_df[filtered_df['overall_color'] == 'RED'].copy()
+    # Sort by worst TTS (lowest first - most critical)
+    critical_df['_tts_sort'] = critical_df['worst_tts'].replace([np.inf], 9999)
+    critical_df = critical_df.sort_values('_tts_sort', ascending=True).head(10)
     
     if len(critical_df) > 0:
         for _, row in critical_df.iterrows():
             with st.expander(f"🔴 {row['station_id']} - {row['zone']}, {row['city']}"):
                 col1, col2, col3 = st.columns(3)
                 with col1:
-                    st.metric("EMA Utilization", f"{row['ema_util']:.1f}%")
-                    st.metric("Velocity", f"{row['velocity']:.2f} ppt/week")
+                    st.metric("Avg Util", f"{row['average_util']:.1f} kWh/day")
+                    st.metric("Worst EMA Util", f"{row['worst_ema_util']:.1f}%", help=f"Week: {row['worst_ema_week']}")
                 with col2:
-                    tts_display = f"{row['tts']:.1f} weeks" if row['tts'] != float('inf') else "∞"
-                    st.metric("Time to Saturation", tts_display)
-                    st.metric("Headroom", f"{row['headroom']:.1f} kWh/day")
+                    tts_display = f"{row['worst_tts']:.1f} weeks" if row['worst_tts'] != float('inf') and pd.notna(row['worst_tts']) else "∞"
+                    st.metric("Worst TTS", tts_display, help=f"Week: {row['worst_tts_week']}")
+                    st.metric("Worst Velocity", f"{row['worst_velocity']:.2f} ppt/week", help=f"Week: {row['worst_velocity_week']}")
                 with col3:
-                    st.metric("HBR", f"{row['hbr']:.1f}%" if row['hbr'] else "N/A")
-                    st.metric("ZHI", f"{row['zhi']:.2f}" if row['zhi'] else "N/A")
+                    st.metric("Worst HBR", f"{row['worst_hbr']:.1f}%" if pd.notna(row['worst_hbr']) else "N/A", help=f"Week: {row['worst_hbr_week']}")
+                    st.metric("Worst ZHI", f"{row['worst_zhi']:.2f}" if pd.notna(row['worst_zhi']) else "N/A", help=f"Week: {row['worst_zhi_week']}")
                 
-                st.markdown(f"**Reason:** {row['red_reason']}")
+                st.markdown(f"**Alert Reason:** {row['overall_reason']}")
     else:
         st.success("✅ No critical stations in current selection!")
     
