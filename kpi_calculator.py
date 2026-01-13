@@ -27,11 +27,11 @@ def parse_weekly_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
     # Identify week columns (w01, w02, etc.)
     week_cols = [col for col in df.columns if col.lower().startswith('w') and col[1:].isdigit()]
     week_cols = sorted(week_cols, key=lambda x: int(x[1:]))
-    
+    df_cols_lower = {c.lower(): c for c in df.columns}
     # Ensure required columns exist
     required_cols = ['station_id', 'zone', 'city']
     for col in required_cols:
-        if col not in df.columns:
+        if col.lower() not in df_cols_lower:
             raise ValueError(f"Missing required column: {col}")
     
     return df, week_cols
