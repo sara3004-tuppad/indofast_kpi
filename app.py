@@ -359,7 +359,7 @@ def main():
     
     chart_col1 = st.columns(1)
     
-    with chart_col1:
+    with chart_col1[0]:
         # Color distribution pie chart
         if len(filtered_df) > 0:
             color_counts = filtered_df['overall_color'].value_counts()
