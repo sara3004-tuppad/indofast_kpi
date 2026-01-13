@@ -178,7 +178,6 @@ def load_sample_data():
 def main():
     # Header
     st.markdown('<h1 class="main-header">IndoFast Early Warning Framework</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Station Planning & Monitoring Dashboard | Bangalore Locked v3.0</p>', unsafe_allow_html=True)
     
     # Sidebar
     with st.sidebar:
