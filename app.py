@@ -332,27 +332,27 @@ def main():
     # Additional metrics row
     st.markdown("---")
     
-    if len(filtered_df) > 0:
-        avg_worst_util = filtered_df['worst_ema_util'].mean()
-        avg_worst_velocity = filtered_df['worst_velocity'].mean()
-        avg_worst_headroom = filtered_df['worst_headroom'].mean()
-        # stations_approaching = len(filtered_df[(filtered_df['worst_tts'] < 12) & (filtered_df['worst_tts'] > 0)])
+    # if len(filtered_df) > 0:
+    #     avg_worst_util = filtered_df['worst_ema_util'].mean()
+    #     avg_worst_velocity = filtered_df['worst_velocity'].mean()
+    #     avg_worst_headroom = filtered_df['worst_headroom'].mean()
+    #     # stations_approaching = len(filtered_df[(filtered_df['worst_tts'] < 12) & (filtered_df['worst_tts'] > 0)])
         
-        mcol1, mcol2, mcol3, mcol4 = st.columns(4)
+    #     mcol1, mcol2, mcol3, mcol4 = st.columns(4)
         
-        with mcol1:
-            st.metric("Avg Worst EMA Util", f"{avg_worst_util:.1f}%", delta=None, help="Average of worst utilization across stations")
+    #     with mcol1:
+    #         st.metric("Avg Worst EMA Util", f"{avg_worst_util:.1f}%", delta=None, help="Average of worst utilization across stations")
         
-        with mcol2:
-            st.metric("Avg Worst Velocity", f"{avg_worst_velocity:.2f} ppt/week", help="Average of worst velocity across stations")
+    #     with mcol2:
+    #         st.metric("Avg Worst Velocity", f"{avg_worst_velocity:.2f} ppt/week", help="Average of worst velocity across stations")
         
-        with mcol3:
-            st.metric("Avg Worst Headroom", f"{avg_worst_headroom:.1f} kWh/day", help="Average of minimum headroom across stations")
+    #     with mcol3:
+    #         st.metric("Avg Worst Headroom", f"{avg_worst_headroom:.1f} kWh/day", help="Average of minimum headroom across stations")
         
-        # with mcol4:
-        #     st.metric("Approaching Saturation", f"{stations_approaching}", help="Stations with worst TTS < 12 weeks")
+    #     # with mcol4:
+    #     #     st.metric("Approaching Saturation", f"{stations_approaching}", help="Stations with worst TTS < 12 weeks")
     
-    st.markdown("---")
+    # st.markdown("---")
     
     # Charts section
     st.markdown("### 📈 Visualizations")
