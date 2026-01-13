@@ -357,7 +357,7 @@ def main():
     # Charts section
     st.markdown("### 📈 Visualizations")
     
-    chart_col1, chart_col2 = st.columns(2)
+    chart_col1, chart_col2 = st.columns(1)
     
     with chart_col1:
         # Color distribution pie chart
@@ -384,87 +384,8 @@ def main():
             )
             st.plotly_chart(fig_pie, use_container_width=True)
     
-    with chart_col2:
-        # Utilization distribution histogram
-        if len(filtered_df) > 0:
-            fig_hist = px.histogram(
-                filtered_df,
-                x='average_util',
-                nbins=20,
-                title="Average Utilization Distribution",
-                color='overall_color',
-                color_discrete_map={
-                    'RED': '#FF4B4B',
-                    'AMBER': '#FFA500',
-                    'GREEN': '#00C853'
-                }
-            )
-            fig_hist.update_layout(
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                font_color='#888',
-                xaxis_title="Average Utilization (kWh/day)",
-                yaxis_title="Number of Stations",
-                barmode='stack'
-            )
-            st.plotly_chart(fig_hist, use_container_width=True)
     
-    # Trend chart for selected filters
-    st.markdown("### 📉 Utilization Trends (All Weeks)")
-    
-    # Get trend data for all weeks - filter by selected stations
-    selected_station_ids = filtered_df['station_id'].unique()
-    trend_data = classified_df[classified_df['station_id'].isin(selected_station_ids)].copy()
-    
-    # Aggregate trend by week
-    weekly_trend = trend_data.groupby('week').agg({
-        'kwh': 'mean',
-        'velocity': 'mean',
-        'station_id': 'count'
-    }).reset_index()
-    weekly_trend.columns = ['week', 'avg_util', 'avg_velocity', 'station_count']
-    weekly_trend = weekly_trend.sort_values('week', key=lambda x: x.str[1:].astype(int))
-    
-    if len(weekly_trend) > 0:
-        fig_trend = make_subplots(specs=[[{"secondary_y": True}]])
-        
-        fig_trend.add_trace(
-            go.Scatter(
-                x=weekly_trend['week'],
-                y=weekly_trend['avg_util'],
-                name="Avg Utilization",
-                line=dict(color='#4A90D9', width=3),
-                fill='tozeroy',
-                fillcolor='rgba(74, 144, 217, 0.1)'
-            ),
-            secondary_y=False
-        )
-        
-        fig_trend.add_trace(
-            go.Scatter(
-                x=weekly_trend['week'],
-                y=weekly_trend['avg_velocity'],
-                name="Avg Velocity",
-                line=dict(color='#FF6B6B', width=2, dash='dot')
-            ),
-            secondary_y=True
-        )
-        
-       
-        
-        fig_trend.update_layout(
-            title="Weekly Utilization & Velocity Trend",
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font_color='#888',
-            hovermode='x unified',
-            legend=dict(orientation="h", yanchor="bottom", y=-0.3, xanchor="center", x=0.5)
-        )
-        
-        fig_trend.update_yaxes(title_text="Utilization (kWh/day)", secondary_y=False)
-        fig_trend.update_yaxes(title_text="Velocity (ppt/week)", secondary_y=True)
-        
-        st.plotly_chart(fig_trend, use_container_width=True)
+
     
     # Zone heatmap
     st.markdown("### 🗺️ Zone Performance Heatmap")
