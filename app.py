@@ -357,7 +357,7 @@ def main():
     # Charts section
     st.markdown("### 📈 Visualizations")
     
-    chart_col1, chart_col2 = st.columns(1)
+    chart_col1 = st.columns(1)
     
     with chart_col1:
         # Color distribution pie chart
