@@ -17,6 +17,8 @@ RED_VEL_THRESHOLD = 3.5  # ppt/week
 RED_OVERLOAD_CONSECUTIVE = 2  # weeks
 
 RED_HBR_THRESHOLD = 80  # %
+RED_HBR_EMA_THRESHOLD = 30  # % - EMA util threshold for Group C
+RED_HBR_EMA_CONSECUTIVE = 2  # weeks - consecutive weeks for EMA condition in Group C
 RED_ZHI_THRESHOLD = 1.40
 
 AMBER_ACC_THRESHOLD = 0.7  # ppt/week²
@@ -77,9 +79,18 @@ def classify_red_group_b(station_df: pd.DataFrame) -> pd.Series:
 def classify_red_group_c(station_df: pd.DataFrame) -> pd.Series:
     """
     Group C - Extreme Headroom Burn:
-    HBR > 80%
+    HBR > 80% AND EMA Util > 30% sustained for 2 consecutive weeks
     """
-    return station_df['hbr'].fillna(0) > RED_HBR_THRESHOLD
+    hbr_condition = station_df['hbr'].fillna(0) > RED_HBR_THRESHOLD
+    
+    # Check EMA util condition for consecutive weeks
+    ema_consecutive = check_consecutive_condition(
+        station_df['ema_util'].fillna(0),
+        lambda x: x > RED_HBR_EMA_THRESHOLD,
+        RED_HBR_EMA_CONSECUTIVE
+    )
+    
+    return hbr_condition & ema_consecutive
 
 
 def classify_red_group_d(station_df: pd.DataFrame) -> pd.Series:
@@ -162,7 +173,7 @@ def classify_station(station_df: pd.DataFrame) -> pd.DataFrame:
         if red_b.iloc[i]:
             reasons_red.append("EMA > 80% & Vel > 3.5 (2 consecutive)")
         if red_c.iloc[i]:
-            reasons_red.append("HBR > 80%")
+            reasons_red.append(f"HBR > {RED_HBR_THRESHOLD}% & EMA > {RED_HBR_EMA_THRESHOLD}% ({RED_HBR_EMA_CONSECUTIVE} consecutive)")
         if red_d.iloc[i]:
             reasons_red.append("ZHI > 1.40")
         
