@@ -79,7 +79,7 @@ def classify_red_group_b(station_df: pd.DataFrame) -> pd.Series:
 def classify_red_group_c(station_df: pd.DataFrame) -> pd.Series:
     """
     Group C - Extreme Headroom Burn:
-    HBR > 80% AND EMA Util > 30% sustained for 2 consecutive weeks
+    HBR > 80% AND EMA Util > 20% sustained for 2 consecutive weeks
     """
     hbr_condition = station_df['hbr'].fillna(0) > RED_HBR_THRESHOLD
     
