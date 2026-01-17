@@ -205,6 +205,10 @@ def main():
         )
         
         st.markdown("---")
+        st.markdown("### 🛠️ Developer Options")
+        debug_mode = st.checkbox("Enable Debug Mode", value=False, help="Show additional data and download options")
+        
+        st.markdown("---")
         st.markdown("### 📋 Legend")
         st.markdown("""
         <span class="status-red">RED</span> Ever triggered critical condition<br><br>
@@ -450,6 +454,26 @@ def main():
         file_name="indofast_stations_summary.csv",
         mime="text/csv"
     )
+    
+    # Debug section - KPI data download
+    if debug_mode:
+        st.markdown("---")
+        st.markdown("### 🐛 Debug: Raw KPI Data")
+        st.markdown("This section provides access to the raw KPI calculations for debugging purposes.")
+        
+        with st.expander("View KPI DataFrame Info", expanded=False):
+            st.markdown(f"**Shape:** {kpi_df.shape[0]} rows × {kpi_df.shape[1]} columns")
+            st.markdown(f"**Columns:** {', '.join(kpi_df.columns.tolist())}")
+            st.dataframe(kpi_df.head(20), use_container_width=True, height=300)
+        
+        kpi_csv = kpi_df.to_csv(index=False)
+        st.download_button(
+            label="📥 Download Raw KPI Data (CSV)",
+            data=kpi_csv,
+            file_name="indofast_kpi_debug.csv",
+            mime="text/csv",
+            key="debug_kpi_download"
+        )
     
     # Top critical stations
     st.markdown("### ⚠️ Stations Requiring Immediate Attention")
