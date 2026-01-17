@@ -134,47 +134,6 @@ def create_metric_card(label: str, value: str, pct: str = None, color_class: str
     """
 
 
-def load_sample_data():
-    """Generate sample data for demonstration."""
-    np.random.seed(42)
-    
-    cities = ['Bangalore', 'Mumbai', 'Delhi', 'Chennai']
-    zones = {
-        'Bangalore': ['Koramangala', 'Whitefield', 'Indiranagar', 'Electronic City'],
-        'Mumbai': ['Andheri', 'Bandra', 'Powai', 'Thane'],
-        'Delhi': ['Connaught Place', 'Gurgaon', 'Noida', 'Dwarka'],
-        'Chennai': ['T Nagar', 'Anna Nagar', 'Velachery', 'OMR']
-    }
-    
-    data = []
-    station_id = 1
-    
-    for city in cities:
-        for zone in zones[city]:
-            for _ in range(3):  # 3 stations per zone
-                row = {
-                    'station_id': f'STN_{station_id:03d}',
-                    'zone': zone,
-                    'city': city,
-                    'start_date': '2024-01-01'
-                }
-                
-                # Generate weekly kWh data with some trend
-                base = np.random.uniform(100, 200)
-                trend = np.random.uniform(-2, 5)
-                noise_scale = np.random.uniform(5, 20)
-                
-                for week in range(1, 25):
-                    kwh = base + trend * week + np.random.normal(0, noise_scale)
-                    kwh = max(0, min(kwh, 300))  # Clamp values
-                    row[f'w{week:02d}'] = round(kwh, 2)
-                
-                data.append(row)
-                station_id += 1
-    
-    return pd.DataFrame(data)
-
-
 def main():
     # Header
     st.markdown('<h1 class="main-header">IndoFast Early Warning Framework</h1>', unsafe_allow_html=True)
@@ -183,30 +142,20 @@ def main():
     with st.sidebar:
         st.markdown("### 📁 Data Source")
         
-        data_source = st.radio(
-            "Select data source:",
-            ["Upload XLSX", "Use Sample Data"],
-            index=1
-        )
-        
         df = None
         
-        if data_source == "Upload XLSX":
-            uploaded_file = st.file_uploader(
-                "Upload your station data",
-                type=['xlsx', 'xls'],
-                help="File should contain: station_id, zone, city, start_date, w01, w02, ..."
-            )
-            
-            if uploaded_file is not None:
-                try:
-                    df = pd.read_excel(uploaded_file)
-                    st.success(f"✅ Loaded {len(df)} stations")
-                except Exception as e:
-                    st.error(f"Error loading file: {e}")
-        else:
-            df = load_sample_data()
-            st.info("📊 Using sample data (48 stations)")
+        uploaded_file = st.file_uploader(
+            "Upload your station data",
+            type=['xlsx', 'xls'],
+            help="File should contain: station_id, zone, city, start_date, w01, w02, ..."
+        )
+        
+        if uploaded_file is not None:
+            try:
+                df = pd.read_excel(uploaded_file)
+                st.success(f"✅ Loaded {len(df)} stations")
+            except Exception as e:
+                st.error(f"Error loading file: {e}")
         
         st.markdown("---")
     
@@ -541,4 +490,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
