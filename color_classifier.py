@@ -17,7 +17,7 @@ RED_VEL_THRESHOLD = 3.5  # ppt/week
 RED_OVERLOAD_CONSECUTIVE = 2  # weeks
 
 RED_HBR_THRESHOLD = 80  # %
-RED_HBR_EMA_THRESHOLD = 30  # % - EMA util threshold for Group C
+RED_HBR_EMA_THRESHOLD = 20  # % - EMA util threshold for Group C
 RED_HBR_EMA_CONSECUTIVE = 2  # weeks - consecutive weeks for EMA condition in Group C
 RED_ZHI_THRESHOLD = 1.40
 
