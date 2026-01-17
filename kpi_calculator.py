@@ -24,15 +24,49 @@ def parse_weekly_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
     Returns:
         Tuple of (cleaned dataframe, list of week column names)
     """
-    # Identify week columns (w01, w02, etc.)
-    week_cols = [col for col in df.columns if col.lower().startswith('w') and col[1:].isdigit()]
+    # Normalize all column names: strip whitespace and convert to lowercase
+    df = df.copy()
+    df.columns = [str(col).strip().lower().replace(' ', '_') for col in df.columns]
+    
+    # Identify week columns (w01, w02, w1, w2, etc.)
+    week_cols = []
+    for col in df.columns:
+        if col.startswith('w') and len(col) >= 2:
+            # Check if remaining part is numeric (e.g., w01, w1, w12)
+            rest = col[1:]
+            if rest.isdigit():
+                week_cols.append(col)
+    
+    # Sort by week number
     week_cols = sorted(week_cols, key=lambda x: int(x[1:]))
-    df_cols_lower = {c.lower(): c for c in df.columns}
-    # Ensure required columns exist
+    
+    if not week_cols:
+        raise ValueError("No weekly columns found. Expected columns like W01, W02, etc.")
+    
+    # Required columns (now all lowercase after normalization)
     required_cols = ['station_id', 'zone', 'city']
-    for col in required_cols:
-        if col.lower() not in df_cols_lower:
-            raise ValueError(f"Missing required column: {col}")
+    
+    # Check for required columns with common variations
+    column_aliases = {
+        'station_id': ['station_id', 'stationid', 'station'],
+        'zone': ['zone'],
+        'city': ['city']
+    }
+    
+    rename_map = {}
+    for standard_name, aliases in column_aliases.items():
+        found = False
+        for alias in aliases:
+            if alias in df.columns:
+                if alias != standard_name:
+                    rename_map[alias] = standard_name
+                found = True
+                break
+        if not found:
+            raise ValueError(f"Missing required column: {standard_name} (or variations: {aliases})")
+    
+    if rename_map:
+        df = df.rename(columns=rename_map)
     
     return df, week_cols
 
@@ -53,10 +87,27 @@ def calculate_ema_series(values: pd.Series, alpha: float = EMA_ALPHA) -> pd.Seri
     Returns:
         Series of EMA values
     """
-    ema = np.zeros(len(values))
-    ema[0] = values.iloc[0] if not pd.isna(values.iloc[0]) else 0
+    if len(values) == 0:
+        return pd.Series([], dtype=float)
     
-    for i in range(1, len(values)):
+    ema = np.zeros(len(values))
+    
+    # Find first non-NaN value to initialize EMA
+    first_valid_idx = 0
+    first_valid_value = 0
+    for i in range(len(values)):
+        if not pd.isna(values.iloc[i]):
+            first_valid_idx = i
+            first_valid_value = values.iloc[i]
+            break
+    
+    # Initialize all values before first valid as 0
+    for i in range(first_valid_idx):
+        ema[i] = 0
+    
+    ema[first_valid_idx] = first_valid_value
+    
+    for i in range(first_valid_idx + 1, len(values)):
         if pd.isna(values.iloc[i]):
             ema[i] = ema[i-1]
         else:
@@ -88,7 +139,7 @@ def calculate_tts(ema_util: float, velocity: float) -> float:
     """
     if velocity > 0:
         tts = (SATURATION_PERCENT - ema_util) / velocity
-        return max(0, tts)  # Can't be negative
+        return tts  
     return float('inf')
 
 
@@ -129,7 +180,12 @@ def calculate_station_kpis(df: pd.DataFrame, week_cols: List[str]) -> pd.DataFra
         station_id = row['station_id']
         zone = row['zone']
         city = row['city']
-        start_date = row.get('start_date', None)
+        # Handle different possible column names for start date (all lowercase after normalization)
+        start_date = None
+        for date_col in ['start_date', 'energized_date']:
+            if date_col in row.index:
+                start_date = row[date_col]
+                break
         
         # Get weekly kWh values
         kwh_values = pd.Series([row[col] for col in week_cols], index=week_cols)
@@ -225,4 +281,3 @@ def process_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
     kpi_df = calculate_zone_city_ema(kpi_df)
     
     return kpi_df, week_cols
-
