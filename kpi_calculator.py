@@ -11,7 +11,7 @@ from typing import Tuple, List
 DAILY_CAPACITY = 264  # kWh/day
 SATURATION_THRESHOLD = 224.4  # kWh/day (85% of capacity)
 SATURATION_PERCENT = 85  # %
-EMA_ALPHA = 0.3
+EMA_ALPHA = 0.2
 
 
 def parse_weekly_data(df: pd.DataFrame) -> Tuple[pd.DataFrame, List[str]]:
