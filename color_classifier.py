@@ -169,21 +169,21 @@ def classify_station(station_df: pd.DataFrame) -> pd.DataFrame:
         
         # Check RED conditions
         if red_a.iloc[i]:
-            reasons_red.append("TTS < 6 weeks (2 consecutive)")
+            reasons_red.append(f"TTS < {RED_TTS_THRESHOLD} weeks ({RED_TTS_CONSECUTIVE} consecutive)")
         if red_b.iloc[i]:
-            reasons_red.append("EMA > 80% & Vel > 3.5 (2 consecutive)")
+            reasons_red.append(f"EMA > {RED_EMA_THRESHOLD}% & Vel > {RED_VEL_THRESHOLD} ({RED_OVERLOAD_CONSECUTIVE} consecutive)")
         if red_c.iloc[i]:
             reasons_red.append(f"HBR > {RED_HBR_THRESHOLD}% & EMA > {RED_HBR_EMA_THRESHOLD}% ({RED_HBR_EMA_CONSECUTIVE} consecutive)")
         if red_d.iloc[i]:
-            reasons_red.append("ZHI > 1.40")
+            reasons_red.append(f"ZHI > {RED_ZHI_THRESHOLD}")
         
         # Check AMBER conditions
         if amber_acc.iloc[i]:
-            reasons_amber.append("Acc > 0.7 (2 consecutive)")
+            reasons_amber.append(f"Acc > {AMBER_ACC_THRESHOLD} ({AMBER_ACC_CONSECUTIVE} consecutive)")
         if amber_vel.iloc[i]:
-            reasons_amber.append("Vel > 2.5 (3 consecutive)")
+            reasons_amber.append(f"Vel > {AMBER_VEL_THRESHOLD} ({AMBER_VEL_CONSECUTIVE} consecutive)")
         if amber_zhi.iloc[i]:
-            reasons_amber.append("ZHI > 1.20")
+            reasons_amber.append(f"ZHI > {AMBER_ZHI_THRESHOLD}")
         
         # Determine final color (RED takes priority)
         if reasons_red:
