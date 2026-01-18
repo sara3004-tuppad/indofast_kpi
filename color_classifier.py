@@ -21,6 +21,9 @@ RED_HBR_EMA_THRESHOLD = 20  # % - EMA util threshold for Group C
 RED_HBR_EMA_CONSECUTIVE = 2  # weeks - consecutive weeks for EMA condition in Group C
 RED_ZHI_THRESHOLD = 1.40
 
+RED_AVG_UTIL_THRESHOLD = 50  # % - 50% of saturation threshold (100%)
+RED_AVG_UTIL_WEEKS = 4  # weeks - for latest N weeks average check
+
 AMBER_ACC_THRESHOLD = 0.7  # ppt/week²
 AMBER_ACC_CONSECUTIVE = 2  # weeks
 
@@ -98,7 +101,37 @@ def classify_red_group_d(station_df: pd.DataFrame) -> pd.Series:
     Group D - Zone Stress Confirmed:
     ZHI > 1.40
     """
-    return station_df['zhi'].fillna(0) > RED_ZHI_THRESHOLD
+    # Check EMA util condition for consecutive weeks
+    ema_consecutive = check_consecutive_condition(
+        station_df['ema_util'].fillna(0),
+        lambda x: x > RED_HBR_EMA_THRESHOLD,
+        RED_HBR_EMA_CONSECUTIVE
+    )
+    return (station_df['zhi'].fillna(0) > RED_ZHI_THRESHOLD) & ema_consecutive  # must be met for 2 consecutive weeks
+
+
+def classify_red_group_e(station_df: pd.DataFrame) -> pd.Series:
+    """
+    Group E - High Average Utilization:
+    Average utilization of latest 4 weeks > 50% of saturation threshold
+    OR Average utilization of all weeks > 50% of saturation threshold
+    """
+    util_values = station_df['ema_util'].fillna(0)
+    results = []
+    
+    for i in range(len(station_df)):
+        # Calculate average of all weeks up to current week
+        all_weeks_avg = util_values.iloc[:i+1].mean()
+        
+        # Calculate average of latest 4 weeks (or all available if less than 4)
+        start_idx = max(0, i + 1 - RED_AVG_UTIL_WEEKS)
+        latest_weeks_avg = util_values.iloc[start_idx:i+1].mean()
+        
+        # Check if either condition is met
+        condition_met = (latest_weeks_avg > RED_AVG_UTIL_THRESHOLD) or (all_weeks_avg > RED_AVG_UTIL_THRESHOLD)
+        results.append(condition_met)
+    
+    return pd.Series(results, index=station_df.index)
 
 
 def classify_amber_acceleration(station_df: pd.DataFrame) -> pd.Series:
@@ -152,6 +185,7 @@ def classify_station(station_df: pd.DataFrame) -> pd.DataFrame:
     red_b = classify_red_group_b(station_df)
     red_c = classify_red_group_c(station_df)
     red_d = classify_red_group_d(station_df)
+    red_e = classify_red_group_e(station_df)
     
     # Check AMBER conditions
     amber_acc = classify_amber_acceleration(station_df)
@@ -176,6 +210,8 @@ def classify_station(station_df: pd.DataFrame) -> pd.DataFrame:
             reasons_red.append(f"HBR > {RED_HBR_THRESHOLD}% & EMA > {RED_HBR_EMA_THRESHOLD}% ({RED_HBR_EMA_CONSECUTIVE} consecutive)")
         if red_d.iloc[i]:
             reasons_red.append(f"ZHI > {RED_ZHI_THRESHOLD}")
+        if red_e.iloc[i]:
+            reasons_red.append(f"Avg Util > {RED_AVG_UTIL_THRESHOLD}% (latest {RED_AVG_UTIL_WEEKS} weeks or all weeks)")
         
         # Check AMBER conditions
         if amber_acc.iloc[i]:
