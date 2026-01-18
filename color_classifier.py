@@ -209,7 +209,7 @@ def classify_station(station_df: pd.DataFrame) -> pd.DataFrame:
         if red_c.iloc[i]:
             reasons_red.append(f"HBR > {RED_HBR_THRESHOLD}% & EMA > {RED_HBR_EMA_THRESHOLD}% ({RED_HBR_EMA_CONSECUTIVE} consecutive)")
         if red_d.iloc[i]:
-            reasons_red.append(f"ZHI > {RED_ZHI_THRESHOLD}")
+            reasons_red.append(f"ZHI > {RED_ZHI_THRESHOLD} & EMA > {RED_HBR_EMA_THRESHOLD}% ({RED_HBR_EMA_CONSECUTIVE} consecutive)")
         if red_e.iloc[i]:
             reasons_red.append(f"Avg Util > {RED_AVG_UTIL_THRESHOLD}% (latest {RED_AVG_UTIL_WEEKS} weeks or all weeks)")
         
