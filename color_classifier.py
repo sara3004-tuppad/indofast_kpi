@@ -163,9 +163,15 @@ def classify_amber_velocity(station_df: pd.DataFrame) -> pd.Series:
 def classify_amber_zhi(station_df: pd.DataFrame) -> pd.Series:
     """
     AMBER Condition 3:
-    ZHI > 1.20
+    ZHI > 1.20 AND EMA Util > 20% for 2 consecutive weeks
     """
-    return station_df['zhi'].fillna(0) > AMBER_ZHI_THRESHOLD
+    # Check EMA util condition for consecutive weeks
+    ema_consecutive = check_consecutive_condition(
+        station_df['ema_util'].fillna(0),
+        lambda x: x > RED_HBR_EMA_THRESHOLD,
+        RED_HBR_EMA_CONSECUTIVE
+    )
+    return (station_df['zhi'].fillna(0) > AMBER_ZHI_THRESHOLD) & ema_consecutive
 
 
 def classify_station(station_df: pd.DataFrame) -> pd.DataFrame:
@@ -219,7 +225,7 @@ def classify_station(station_df: pd.DataFrame) -> pd.DataFrame:
         if amber_vel.iloc[i]:
             reasons_amber.append(f"Vel > {AMBER_VEL_THRESHOLD} ({AMBER_VEL_CONSECUTIVE} consecutive)")
         if amber_zhi.iloc[i]:
-            reasons_amber.append(f"ZHI > {AMBER_ZHI_THRESHOLD}")
+            reasons_amber.append(f"ZHI > {AMBER_ZHI_THRESHOLD} & EMA > {RED_HBR_EMA_THRESHOLD}% ({RED_HBR_EMA_CONSECUTIVE} consecutive)")
         
         # Determine final color (RED takes priority)
         if reasons_red:
