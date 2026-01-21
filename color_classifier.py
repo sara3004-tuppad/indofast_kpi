@@ -56,7 +56,7 @@ def check_consecutive_condition(series: pd.Series, condition_func, n_consecutive
 def classify_red_group_a(station_df: pd.DataFrame) -> pd.Series:
     """
     Group A - Confirmed Saturation Risk:
-    TTS < 6 weeks for 2 consecutive weeks
+    TTS < 8 weeks for 2 consecutive weeks
     """
     condition = check_consecutive_condition(
         station_df['tts'],
