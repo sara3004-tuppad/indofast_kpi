@@ -9,7 +9,7 @@ from typing import Dict, List, Tuple
 
 
 # Classification thresholds
-RED_TTS_THRESHOLD = 6  # weeks
+RED_TTS_THRESHOLD = 8  # weeks
 RED_TTS_CONSECUTIVE = 2  # weeks
 
 RED_EMA_THRESHOLD = 80  # %
